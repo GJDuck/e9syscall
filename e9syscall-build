@@ -1,0 +1,138 @@
+#!/bin/bash
+#
+# Copyright (C) 2020 National University of Singapore
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+if [ -t 1 ]
+then
+    RED="\033[31m"
+    GREEN="\033[32m"
+    YELLOW="\033[33m"
+    BOLD="\033[1m"
+    OFF="\033[0m"
+else
+    RED=
+    GREEN=
+    YELLOW=
+    BOLD=
+    OFF=
+fi
+
+usage()
+{
+    echo -e "${RED}usage${OFF}: $0 [OPTIONS] hook.c" >&2
+    echo >&2
+    echo "OPTIONS:" >&2
+    echo "    -l FILE" >&2
+    echo "        Use FILE as the libc.so [default: /lib/x86_64-linux-gnu/libc.so.6]" >&2
+    echo >&2
+    exit 1
+}
+
+LIBC=/lib/x86_64-linux-gnu/libc.so.6
+
+while getopts "l:" OPTION
+do
+    case "$OPTION"
+    in
+        l)
+            LIBC=$OPTARG
+            ;;
+        *)
+            usage
+            ;;
+    esac
+done
+
+shift $((OPTIND-1))
+if [ $# != 1 ]
+then
+    usage
+fi
+
+HOOK=$1
+HOOKNAME=`basename "$HOOK" .c`
+
+set -e
+
+# STEP (1): install e9patch if necessary:
+if [ ! -x ./e9patch ]
+then
+    if [ ! -f e9patch-master.zip ]
+    then
+        echo -e "${GREEN}$0${OFF}: downloading e9patch-master.zip..."
+        wget -O e9patch-master.zip https://github.com/GJDuck/e9patch/archive/master.zip
+    fi
+
+    echo -e "${GREEN}$0${OFF}: extracting e9patch-master.zip..."
+    unzip e9patch-master.zip
+
+    echo -e "${GREEN}$0${OFF}: building e9patch..."
+    cd e9patch-master
+    ./build.sh
+    cd ..
+    ln -f -s e9patch-master/e9patch
+    ln -f -s e9patch-master/e9tool
+    ln -f -s e9patch-master/e9compile.sh
+    echo -e "${GREEN}$0${OFF}: e9patch has been built..."
+else
+	echo -e "${GREEN}$0${OFF}: using existing e9patch..."
+fi
+
+# STEP (2): build the hook code:
+echo -e "${GREEN}$0${OFF}: building hook ($HOOK)..."
+./e9compile.sh e9syscall.c -O2 -Werror -include "$HOOK" -I "$PWD"
+mv e9syscall "e9syscall-$HOOKNAME"
+
+# STEP (3): patch libc:
+echo -e "${GREEN}$0${OFF}: patching libc ($LIBC)..."
+./e9tool \
+    --match  'asm=syscall'
+    --action 'call[naked] intercept(rsp,next)@'"e9syscall-$HOOKNAME" \
+    "$LIBC" -o "libc-$HOOKNAME.so" | tee "e9patch-$HOOKNAME.log"
+
+echo -e "${GREEN}$0${OFF}: done!"
+echo
+
+echo -e "${YELLOW}        ___                          _ _ "
+echo -e "   ___ / _ \\ ___ _   _ ___  ___ __ _| | |"
+echo -e "  / _ \\ (_) / __| | | / __|/ __/ _\` | | |"
+echo -e " |  __/\\__, \\__ \\ |_| \\__ \\ (_| (_| | | |"
+echo -e "  \\___|  /_/|___/\\__, |___/\\___\\__,_|_|_|"
+echo -e "                 |___/${OFF}"
+echo
+
+if grep -e 'num_patched .*(100.00%)' "e9patch-$HOOKNAME.log" > /dev/null
+then
+    echo -e "${GREEN}SUCCESS${OFF}!"
+    echo
+    echo -e "Successfully built the patched library ${YELLOW}libc-$HOOKNAME.so${OFF}."
+else
+    echo -e "${RED}WARNING${OFF}!"
+    echo
+    echo -e "Built the patched library ${YELLOW}libc-$HOOKNAME.so${OFF}, however 100% coverage was not"
+    echo "achieved.  This means that some system calls will not be intercepted."
+fi
+
+echo
+echo "To use, run the following command:"
+echo
+echo "    LD_PRELOAD=\"$PWD/libc-$HOOKNAME.so\" command ..."
+echo
+echo "For example:"
+echo
+echo "    LD_PRELOAD=\"$PWD/libc-$HOOKNAME.so\" ls -l"
+echo
+

@@ -84,7 +84,7 @@ A few different system call interception libraries and tools have been
 developed, including:
 
 Library/Tool | Static? | `ptrace`? | `SIGTRAP`? 
---- | --- | ---
+--- | --- | --- | ---
 [`syscall_intercept`](https://github.com/pmem/syscall_intercept) | &#9744; | &#9744; | &#9744;
 [`SaBRe`](https://github.com/srg-imperial/SaBRe) | | &#9744; | &#9744; | &#9744;
 [`libsystrap`](https://github.com/stephenrkell/libsystrap) | &#9744; | &#9744; | &#9745;

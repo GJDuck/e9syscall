@@ -36,9 +36,9 @@ asm
     "syscall:\n"
 
     // Disallow syscalls that MUST execute in the original context:
-    "cmp $" STRING(__NR_rt_sigreturn) ",%eax\n"
+    "cmp $" STRING(SYS_rt_sigreturn) ",%eax\n"
     "je .Lno_sys\n"
-    "cmp $" STRING(__NR_clone) ",%eax\n"
+    "cmp $" STRING(SYS_clone) ",%eax\n"
     "je .Lno_sys\n"
 
     // Convert SYSV -> SYSCALL ABI:
@@ -64,70 +64,10 @@ asm
 /*
  * Entry point.
  */
-asm
-(
-    // Arguments:
-    // %rdi       = old %rsp
-    // %rsi       = address of the next instruction.
-    // 0x10(%rsp) = old %rsi
-    // 0x08(%rsp) = old %rdi
-
-    ".globl intercept\n"
-    "intercept:\n"
-
-    // Save the callno:
-    "push %rax\n"
-
-    // Save the old %rsp and next address:
-    "push %rdi\n"   // Push old %rsp
-    "push %rsi\n"   // Push next
-
-    // Save state:
-    "push %rdx\n"
-    "push %r8\n"
-    "push %r10\n"
-
-    // Setup hook() arguments:
-    "sub $8,%rsp\n"
-    "push %rsp\n"
-    "push %r9\n"
-    "mov %r8,%r9\n"
-    "mov %r10,%r8\n"
-    "mov %rdx,%rcx\n"
-    "mov 0x10+9*8(%rsp),%rdx\n"
-    "mov 0x08+9*8(%rsp),%rsi\n"
-    "mov %rax,%rdi\n"
-
-    // Call hook():
-    "callq hook\n"
-
-    // Restore state:
-    "mov 0x10+9*8(%rsp),%rsi\n"
-    "mov 0x08+9*8(%rsp),%rdi\n"
-    "pop %r9\n"
-    "add $16,%rsp\n"
-    "pop %r10\n"
-    "pop %r8\n"
-    "pop %rdx\n"
-
-    // Load the old %rsp and next address into %rcx/%r11
-    // (%rcx, %r11 are registers that syscall can clobber)
-    "pop %rcx\n"    // Pop next
-    "pop %r11\n"    // Pop old %rsp
-
-    // Test if we need to execute the original syscall:
-    "test %eax,%eax\n"
-    "jne .Lsyscall\n"
-
-    // The original syscall has been replaced:
-    "mov -6*8(%rsp),%rax\n"
-    "mov %r11,%rsp\n"
-    "jmpq *%rcx\n"
-    "ud2\n"
-
-    // The original syscall should be executed:
-    ".Lsyscall:\n"
-    "pop %rax\n"    // Restore the callno
-    "retq\n"
-);
+int intercept(intptr_t *rax, intptr_t rdi, intptr_t rsi, intptr_t rdx,
+    intptr_t r10, intptr_t r8, intptr_t r9)
+{
+    int callno = (int)*rax;
+    return hook(callno, rdi, rsi, rdx, r10, r8, r9, rax);
+}
 

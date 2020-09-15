@@ -94,13 +94,14 @@ fi
 # STEP (2): build the hook code:
 echo -e "${GREEN}$0${OFF}: building hook ($HOOK)..."
 ./e9compile.sh e9syscall.c -O2 -Werror -include "$HOOK" -I "$PWD"
-mv e9syscall "e9syscall-$HOOKNAME"
+mv e9syscall "e9syscall_$HOOKNAME"
 
 # STEP (3): patch libc:
 echo -e "${GREEN}$0${OFF}: patching libc ($LIBC)..."
+echo "./e9tool --match 'asm=syscall' --action 'call[conditional] intercept(&rax,rdi,rsi,rdx,r10,r8,r9)@'"e9syscall_$HOOKNAME" "$LIBC" -o "libc-$HOOKNAME.so""
 ./e9tool \
-    --match  'asm=syscall'
-    --action 'call[naked] intercept(rsp,next)@'"e9syscall-$HOOKNAME" \
+    --match  'asm=syscall' \
+    --action 'call[conditional] intercept(&rax,rdi,rsi,rdx,r10,r8,r9)@'"e9syscall_$HOOKNAME" \
     "$LIBC" -o "libc-$HOOKNAME.so" | tee "e9patch-$HOOKNAME.log"
 
 echo -e "${GREEN}$0${OFF}: done!"

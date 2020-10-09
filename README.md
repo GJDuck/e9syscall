@@ -2,24 +2,33 @@
 
 E9Syscall is a system call interception toolkit for `x86_64 Linux`.
 
-Unlike other system call interception tools, E9Syscall does not
-use `ptrace` or signal handlers (`SIGTRAP`).
+E9Syscall uses [E9Patch](https://github.com/GJDuck/e9patch) to statically
+rewrite `libc.so` into a new version with all system calls intercepted.
+Unlike other interception tools, E9Syscall does not rely on `ptrace` or
+signal handlers (`SIGTRAP`).
+
+## Build
+
+To build E9Syscall, simply run the `build.sh` script:
+
+         $ ./build.sh
 
 ## Usage
 
 To use E9Syscall:
 
-1. Implement your system call hook routine, e.g., in a file `hook.c`
+1. Implement your system call hook routine, e.g., in a file `hook.c`.
+   See the `examples/` directory for some examples.
 2. Build a replacement `libc.so` using the command:
 
-           ./e9syscall-build hook.c
+         $ ./e9syscall-build hook.c
 
 This will build a modified `libc-hook.so` file which will call the hook
 function every time a system call is executed.
 To use, simply `LD_PRELOAD` the new library to replace the default,
 e.g.:
 
-        LD_PRELOAD=$PWD/libc-hook.so ls
+        $ LD_PRELOAD=$PWD/libc-hook.so ls
 
 The hook function has the following type signature:
 
@@ -31,7 +40,7 @@ The hook function has the following type signature:
                  intptr_t arg6,
                  intptr_t *result);
 
-The behaviour depends on the return value of the took function.
+The behavior depends on the return value of the took function.
 
 * If zero, the original system call will be executed as normal.
 * If non-zero, the original system call will be replaced with
@@ -44,17 +53,35 @@ This design was inspired by
 
 ## Example
 
-For example, to log system calls to `stderr`:
+The `examples/encrypt.c` hook will "encrypt" all `stderr`/`stdout` using
+[ROT13](https://en.wikipedia.org/wiki/ROT13).
+To build, simply run:
 
-        ./e9syscall-build examples/print.c
-        LD_PRELOAD=$PWD/libc-print.so ls
+        $ ./e9syscall examples/encrypt.c
 
-See `examples/*.c` for other example hook functions.
+This will build a modified `libc-encrypt.so` file.
+
+By default, the output of the `ls` command is not encrypted:
+
+<p align="center">
+<img src="img/default.png"
+     alt="Default ls">
+</p>
+
+By using `LD_PRELOAD` and `libc-encrypt.so`, the output of the `ls`
+command is automatically encrypted:
+
+<p align="center">
+<img src="img/encrypted.png"
+     alt="Encrypted ls">
+</p>
+
+See the `examples/*.c` files for other example hook functions.
 
 ## Limitations
 
-For technical reasons, the `SYS_rt_sigreturn` and `SYS_clone` system calls cannot
-be replaced.
+For technical reasons, the `SYS_rt_sigreturn` and `SYS_clone` system calls
+cannot be replaced.
 
 The instrumentation code is somewhat limited, including:
 
@@ -83,33 +110,34 @@ is very fast.
 A few different system call interception libraries and tools have been
 developed, including:
 
-Library/Tool | Static? | `ptrace`? | `SIGTRAP`? 
---- | --- | --- | ---
-[`syscall_intercept`](https://github.com/pmem/syscall_intercept) | &#9744; | &#9744; | &#9744;
-[`SaBRe`](https://github.com/srg-imperial/SaBRe) | | &#9744; | &#9744; | &#9744;
-[`libsystrap`](https://github.com/stephenrkell/libsystrap) | &#9744; | &#9744; | &#9745;
-[`ptrace_do`](https://github.com/emptymonkey/ptrace_do) | &#9744; | &#9745; | &#9744;
-[`fssb`](https://github.com/adtac/fssb) | &#9744; | &#9745; | &#9744;
+Library/Tool | `ptrace`? | `SIGTRAP`? 
+--- | --- | ---
+[`syscall_intercept`](https://github.com/pmem/syscall_intercept) | &#9744; | &#9744;
+[`SaBRe`](https://github.com/srg-imperial/SaBRe) | &#9744; | &#9744; | &#9744;
+[`libsystrap`](https://github.com/stephenrkell/libsystrap) | &#9744; | &#9745;
+[`ptrace_do`](https://github.com/emptymonkey/ptrace_do) | &#9745; | &#9744;
+[`fssb`](https://github.com/adtac/fssb) | &#9745; | &#9744;
 
 Some tools use `ptrace` or signal handlers, however this is generally slow
 since it involves context switching.
 E9Syscall calls the hook function directly without one (or more)
 context switches.
 
-Both `syscall_intercept` and `SaBRe` avoid context switching by
+Like E9Syscall, both `syscall_intercept` and `SaBRe` also use binary
+rewriting.
+However, these tools use a different rewriting methodology, including:
 
 1. replacing multiple instructions with jumps; and/or
 2. replacing NOP-padding with jumps.
 
-In fact, both `syscall_intercept` and `SaBRe` appear to be very similar tools.
-However, this form of binary rewriting is potentially unsound, since it
-assumes that both 1. and 2. are not affecting jump targets.
-For limited applications such as system call interception, this is probably
-OK in practice.
+This assumes that both 1. and 2. do not affect jump targets, which
+is not sound in the general case.
+However, for limited applications such as system call interception,
+it is probably OK in practice.
 
-In contrast, E9Syscall uses E9Patch to safely replace `syscall` instructions with
-calls to the hook function with modifying jump targets.
-The method E9Patch uses are somewhat sophisticated, so please see
+E9Syscall uses E9Patch to safely rewrite `syscall` instructions
+without modifying jump targets.
+Please see
 [here](https://github.com/GJDuck/e9patch) for more information.
 
 ## License

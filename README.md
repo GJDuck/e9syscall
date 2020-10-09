@@ -64,7 +64,7 @@ This will build a modified `libc-encrypt.so` file.
 By default, the output of the `ls` command is not encrypted:
 
 <p align="center">
-<img src="img/default.png"
+<img src="imgs/default.png"
      alt="Default ls">
 </p>
 
@@ -72,7 +72,7 @@ By using `LD_PRELOAD` and `libc-encrypt.so`, the output of the `ls`
 command is automatically encrypted:
 
 <p align="center">
-<img src="img/encrypted.png"
+<img src="imgs/encrypted.png"
      alt="Encrypted ls">
 </p>
 

@@ -110,7 +110,6 @@ is very fast.
 A few different system call interception libraries and tools have been
 developed, including:
 
-<p align="center">
 Library/Tool | `ptrace`? | `SIGTRAP`? 
 --- | --- | ---
 [`syscall_intercept`](https://github.com/pmem/syscall_intercept) | &#9744; | &#9744;
@@ -118,7 +117,6 @@ Library/Tool | `ptrace`? | `SIGTRAP`?
 [`libsystrap`](https://github.com/stephenrkell/libsystrap) | &#9744; | &#9745;
 [`ptrace_do`](https://github.com/emptymonkey/ptrace_do) | &#9745; | &#9744;
 [`fssb`](https://github.com/adtac/fssb) | &#9745; | &#9744;
-</p>
 
 Some tools use `ptrace` or signal handlers, however this is generally slow
 since it involves context switching.

@@ -21,7 +21,7 @@ To use E9Syscall:
    See the `examples/` directory for some examples.
 2. Build a replacement `libc.so` using the command:
 
-         $ ./e9syscall-build hook.c
+         $ ./e9syscall hook.c
 
 This will build a modified `libc-hook.so` file which will call the hook
 function every time a system call is executed.

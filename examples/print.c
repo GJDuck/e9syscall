@@ -19,12 +19,6 @@
 
 #include "e9syscall.h"
 
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <sys/mman.h>
-#include <signal.h>
-
 #define COLOR_CLEAR     0
 #define COLOR_RED       1
 #define COLOR_GREEN     2
@@ -141,314 +135,226 @@ static const struct syscall_s syscalls[] =
 
 /**************************************************************************/
 
-struct stream_s
+static void write_color(FILE *stream, int color)
 {
-    size_t pos;
-    char buf[4096];
-};
-
-static void write_char(struct stream_s *stream, char c)
-{
-    if (stream->pos >= sizeof(stream->buf))
-        return;
-    stream->buf[stream->pos++] = c;
-}
-
-static void write_string(struct stream_s *stream, const char *s)
-{
-    for (; *s != '\0'; s++)
-        write_char(stream, *s);
-}
-
-static void write_string_2(struct stream_s *stream, const char *s,
-    const char *t)
-{
-    write_string(stream, s);
-    write_string(stream, t);
-}
-
-static void write_color(struct stream_s *stream, int color)
-{
-    if (stream->pos >= sizeof(stream->buf) - 6)
-        return;
     switch (color)
     {
         case COLOR_CLEAR:
-            write_string(stream, "\33[0m");
+            fputs("\33[0m", stream);
             break;
         case COLOR_RED:
-            write_string(stream, "\33[31m");
+            fputs("\33[31m", stream);
             break;
         case COLOR_GREEN:
-            write_string(stream, "\33[32m");
+            fputs("\33[32m", stream);
             break;
         case COLOR_YELLOW:
-            write_string(stream, "\33[33m");
+            fputs("\33[33m", stream);
             break;
     }
 }
 
-static void write_int(struct stream_s *stream, intptr_t x)
-{
-    if (x < 0)
-    {
-        write_char(stream, '-');
-        x = -x;
-    }
-    if (x == 0)
-    {
-        write_char(stream, '0');
-        return;
-    }
-    uintptr_t y = (uintptr_t)x;
-    uintptr_t r = 10000000000000000000ull;
-    bool seen = false;
-    while (r != 0)
-    {
-        char c = '0' + y / r;
-        y %= r;
-        r /= 10;
-        if (!seen && c == '0')
-            continue;
-        seen = true;
-        write_char(stream, c);
-    }
-}
-
-static const char xdigs[] = "0123456789abcdef";
-static void write_hex(struct stream_s *stream, uintptr_t x)
-{
-    write_string(stream, "0x");
-    if (x == 0)
-    {
-        write_char(stream, '0');
-        return;
-    }
-    int shift = (15 * 4);
-    bool seen = false;
-    while (shift >= 0)
-    {
-        char c = xdigs[(x >> shift) & 0xF];
-        shift -= 4;
-        if (!seen && c == '0')
-            continue;
-        seen = true;
-        write_char(stream, c);
-    }
-}
-
-static void write_byte(struct stream_s *stream, uint8_t c)
+static void write_byte(FILE *stream, uint8_t c)
 {
     switch (c)
     {
         case '\0':
-            write_string(stream, "\\0");
+            fputs("\\0", stream);
             return;
         case '\t':
-            write_string(stream, "\\t");
+            fputs("\\t", stream);
             return;
         case '\n':
-            write_string(stream, "\\n");
+            fputs("\\n", stream);
             return;
         case '\r':
-            write_string(stream, "\\r");
+            fputs("\\r", stream);
             return;
         case '\v':
-            write_string(stream, "\\v");
+            fputs("\\v", stream);
             return;
         default:
             break;
     }
     if (c < ' ' || c >= 127)
     {
-        write_string(stream, "\\x0");
-        write_char(stream, xdigs[(c >> 4) & 0xF]);
-        write_char(stream, xdigs[c & 0xF]);
+        fprintf(stream, "\\x0%.2x", (unsigned)c);
         return;
     }
-    write_char(stream, (char)c);
+    fputc((char)c, stream);
 }
 
-static void write_open_flags(struct stream_s *stream, intptr_t flags)
+static void write_open_flags(FILE *stream, intptr_t flags)
 {
     if ((flags & O_RDWR) == O_RDWR)
-        write_string(stream, "O_RDWR");
+        fputs("O_RDWR", stream);
     else if ((flags & O_RDONLY) == O_RDONLY)
-        write_string(stream, "O_RDONLY");
+        fputs("O_RDONLY", stream);
     else if ((flags & O_WRONLY) == O_WRONLY)
-        write_string(stream, "O_WRONLY");
+        fputs("O_WRONLY", stream);
     else
-        write_string(stream, "???");
+        fputs("???", stream);
     if (flags & O_APPEND)
-        write_string(stream, " | O_APPEND");
+        fputs(" | O_APPEND", stream);
     if (flags & O_ASYNC)
-        write_string(stream, " | O_ASYNC");
+        fputs(" | O_ASYNC", stream);
     if (flags & O_CLOEXEC)
-        write_string(stream, " | O_CLOEXEC");
+        fputs(" | O_CLOEXEC", stream);
     if (flags & O_CREAT)
-        write_string(stream, " | O_CREAT");
+        fputs(" | O_CREAT", stream);
     if (flags & O_DIRECTORY)
-        write_string(stream, " | O_DIRECTORY");
+        fputs(" | O_DIRECTORY", stream);
     if (flags & O_DSYNC)
-        write_string(stream, " | O_DSYNC");
+        fputs(" | O_DSYNC", stream);
     if (flags & O_EXCL)
-        write_string(stream, " | O_EXCL");
+        fputs(" | O_EXCL", stream);
     if (flags & O_NOCTTY)
-        write_string(stream, " | O_NOCTTY");
+        fputs(" | O_NOCTTY", stream);
     if (flags & O_NOFOLLOW)
-        write_string(stream, " | O_NOFOLLOW");
+        fputs(" | O_NOFOLLOW", stream);
     if (flags & O_NONBLOCK)
-        write_string(stream, " | O_NONBLOCK");
+        fputs(" | O_NONBLOCK", stream);
     if (flags & O_SYNC)
-        write_string(stream, " | O_SYNC");
+        fputs(" | O_SYNC", stream);
     if (flags & O_TRUNC)
-        write_string(stream, " | O_TRUNC");
+        fputs(" | O_TRUNC", stream);
     flags &= ~(O_ACCMODE | O_APPEND | O_CLOEXEC | O_CREAT | O_DIRECTORY |
         O_DSYNC | O_EXCL | O_NOCTTY | O_NOFOLLOW | O_NONBLOCK | O_SYNC |
         O_TRUNC);
     if (flags != 0)
-    {
-        write_string(stream, " | ");
-        write_hex(stream, flags);
-    }
+        fprintf(stream, " | 0x%x", flags);
 }
 
-static void write_mode(struct stream_s *stream, intptr_t mode)
+static void write_mode(FILE *stream, intptr_t mode)
 {
-    size_t pos = stream->pos;
+    size_t pos = 0;
     if ((mode & S_IRWXU) == S_IRWXU)
-        write_string(stream, "S_IRWXU");
+        pos += fputs("S_IRWXU", stream);
     else
     {
         if (mode & S_IRUSR)
-            write_string(stream, "S_IRUSR");
+            pos += fputs("S_IRUSR", stream);
         if (mode & S_IWUSR)
-            write_string_2(stream, (stream->pos == pos? "": " | "), "S_IWUSR");
+            pos += fprintf(stream, "%s%s", (pos == 0? "": " | "), "S_IWUSR");
         if (mode & S_IXUSR)
-            write_string_2(stream, (stream->pos == pos? "": " | "), "S_IXUSR");
+            pos += fprintf(stream, "%s%s", (pos == 0? "": " | "), "S_IXUSR");
     }
     if ((mode & S_IRWXG) == S_IRWXG)
-        write_string_2(stream, (stream->pos == pos? "": " | "), "S_IRWXG");
+        fprintf(stream, "%s%s", (pos == 0? "": " | "), "S_IRWXG");
     else
     {
         if (mode & S_IRGRP)
-            write_string_2(stream, (stream->pos == pos? "": " | "), "S_IRGRP");
+            pos += fprintf(stream, "%s%s", (pos == 0? "": " | "), "S_IRGRP");
         if (mode & S_IWGRP)
-            write_string_2(stream, (stream->pos == pos? "": " | "), "S_IWGRP");
+            pos += fprintf(stream, "%s%s", (pos == 0? "": " | "), "S_IWGRP");
         if (mode & S_IXGRP)
-            write_string_2(stream, (stream->pos == pos? "": " | "), "S_IXGRP");
+            pos += fprintf(stream, "%s%s", (pos == 0? "": " | "), "S_IXGRP");
     }
     if ((mode & S_IRWXO) == S_IRWXO)
-        write_string_2(stream, (stream->pos == pos? "": " | "), "S_IRWXG");
+        fprintf(stream, "%s%s", (pos == 0? "": " | "), "S_IRWXG");
     else
     {
         if (mode & S_IROTH)
-            write_string_2(stream, (stream->pos == pos? "": " | "), "S_IROTH");
+            pos += fprintf(stream, "%s%s", (pos == 0? "": " | "), "S_IROTH");
         if (mode & S_IWOTH)
-            write_string_2(stream, (stream->pos == pos? "": " | "), "S_IWOTH");
+            pos += fprintf(stream, "%s%s", (pos == 0? "": " | "), "S_IWOTH");
         if (mode & S_IXOTH)
-            write_string_2(stream, (stream->pos == pos? "": " | "), "S_IXOTH");
+            pos += fprintf(stream, "%s%s", (pos == 0? "": " | "), "S_IXOTH");
     }
     if (mode & S_ISUID)
-        write_string_2(stream, (stream->pos == pos? "": " | "), "S_ISUID");
+        pos += fprintf(stream, "%s%s", (pos == 0? "": " | "), "S_ISUID");
     if (mode & S_ISGID)
-        write_string_2(stream, (stream->pos == pos? "": " | "), "S_ISGID");
+        pos += fprintf(stream, "%s%s", (pos == 0? "": " | "), "S_ISGID");
     if (mode & S_ISVTX)
-        write_string_2(stream, (stream->pos == pos? "": " | "), "S_ISVTX");
+        pos += fprintf(stream, "%s%s", (pos == 0? "": " | "), "S_ISVTX");
     intptr_t mode0 = mode;
     mode &= ~(S_IRWXU | S_IRWXG | S_IRWXO | S_ISUID | S_ISGID | S_ISVTX);
     if (mode != 0 || mode0 == 0)
-    {
-        write_string(stream, (stream->pos == pos? "": " | "));
-        write_hex(stream, mode);
-    }
+        fprintf(stream, "%s0x%x", (pos == 0? "": " | "), mode);
 }
 
-static void write_prot(struct stream_s *stream, intptr_t prot)
+static void write_prot(FILE *stream, intptr_t prot)
 {
     if (prot == PROT_NONE)
     {
-        write_string(stream, "PROT_NONE");
+        fputs("PROT_NONE", stream);
         return;
     }
-    size_t pos = stream->pos;
+    size_t pos = 0;
     if (prot & PROT_READ)
-        write_string(stream, "PROT_READ");
+        pos += fputs("PROT_READ", stream);
     if (prot & PROT_WRITE)
-        write_string_2(stream, (stream->pos == pos? "": " | "), "PROT_WRITE");
+        pos += fprintf(stream, "%s%s", (pos == 0? "": " | "), "PROT_WRITE");
     if (prot & PROT_EXEC)
-        write_string_2(stream, (stream->pos == pos? "": " | "), "PROT_EXEC");
+        pos += fprintf(stream, "%s%s", (pos == 0? "": " | "), "PROT_EXEC");
     prot &= ~(PROT_READ | PROT_WRITE | PROT_EXEC);
     if (prot != 0)
-    {
-        write_string(stream, (stream->pos == pos? "": " | "));
-        write_hex(stream, prot);
-    }
+        fprintf(stream, "%s0x%x", (pos == 0? "": " | "), prot);
 }
 
-static void write_signal(struct stream_s *stream, intptr_t sig)
+static void write_signal(FILE *stream, intptr_t sig)
 {
     switch (sig)
     {
         case SIGHUP:
-            write_string(stream, "SIGHUP");
+            fputs("SIGHUP", stream);
             break;
         case SIGINT:
-            write_string(stream, "SIGINT");
+            fputs("SIGINT", stream);
             break;
         case SIGQUIT:
-            write_string(stream, "SIGQUIT");
+            fputs("SIGQUIT", stream);
             break;
         case SIGFPE:
-            write_string(stream, "SIGFPE");
+            fputs("SIGFPE", stream);
             break;
         case SIGKILL:
-            write_string(stream, "SIGKILL");
+            fputs("SIGKILL", stream);
             break;
         case SIGSEGV:
-            write_string(stream, "SIGSEGV");
+            fputs("SIGSEGV", stream);
             break;
         case SIGPIPE:
-            write_string(stream, "SIGPIPE");
+            fputs("SIGPIPE", stream);
             break;
         case SIGALRM:
-            write_string(stream, "SIGALRM");
+            fputs("SIGALRM", stream);
             break;
         case SIGTERM:
-            write_string(stream, "SIGTERM");
+            fputs("SIGTERM", stream);
             break;
         case SIGUSR1:
-            write_string(stream, "SIGUSR1");
+            fputs("SIGUSR1", stream);
             break;
         case SIGUSR2:
-            write_string(stream, "SIGUSR2");
+            fputs("SIGUSR2", stream);
             break;
         case SIGCHLD:
-            write_string(stream, "SIGCHLD");
+            fputs("SIGCHLD", stream);
             break;
         case SIGCONT:
-            write_string(stream, "SIGCONT");
+            fputs("SIGCONT", stream);
             break;
         case SIGSTOP:
-            write_string(stream, "SIGSTOP");
+            fputs("SIGSTOP", stream);
             break;
         case SIGBUS:
-            write_string(stream, "SIGBUS");
+            fputs("SIGBUS", stream);
             break;
         case SIGPOLL:
-            write_string(stream, "SIGPOLL");
+            fputs("SIGPOLL", stream);
             break;
         case SIGPROF:
-            write_string(stream, "SIGPROF");
+            fputs("SIGPROF", stream);
             break;
         case SIGSYS:
-            write_string(stream, "SIGSYS");
+            fputs("SIGSYS", stream);
             break;
         case SIGTRAP:
-            write_string(stream, "SIGTRAP");
+            fputs("SIGTRAP", stream);
             break;
         default:
-            write_int(stream, sig);
+            fprintf(stream, "%d", sig);
             break;
     }
 }
@@ -459,19 +365,17 @@ static void write_signal(struct stream_s *stream, intptr_t sig)
 int hook(int callno, intptr_t arg1, intptr_t arg2, intptr_t arg3,
     intptr_t arg4, intptr_t arg5, intptr_t arg6, intptr_t *result)
 {
-    struct stream_s stream0;
-    struct stream_s *stream = &stream0;
-    stream->pos = 0;
-
+    FILE *stream = stderr;
     intptr_t args[] = {arg1, arg2, arg3, arg4, arg5, arg6, 0};
+    
     if (callno >= 0 && callno < sizeof(syscalls) / sizeof(syscalls[0]))
     {
         const struct syscall_s *info = syscalls + callno;
 
         write_color(stream, COLOR_YELLOW);
-        write_string(stream, info->name);
+        fputs(info->name, stream);
         write_color(stream, COLOR_CLEAR);
-        write_char(stream, '(');
+        fputc('(', stream);
 
         bool first = true;
         for (unsigned i = 0; i < 6; i++)
@@ -479,36 +383,35 @@ int hook(int callno, intptr_t arg1, intptr_t arg2, intptr_t arg3,
             if (info->args[i].kind == ARG_NONE)
                 break;
             if (!first)
-                write_string(stream, ", ");
+                fputs(", ", stream);
             first = false;
-            write_string(stream, info->args[i].name);
-            write_string(stream, "=(");
+            fprintf(stream, "%s=(", info->args[i].name);
             write_color(stream, COLOR_GREEN);
-            write_string(stream, info->args[i].type);
+            fputs(info->args[i].type, stream);
             write_color(stream, COLOR_CLEAR);
-            write_char(stream, ')');
+            fputc(')', stream);
             write_color(stream, COLOR_RED);
             switch (info->args[i].kind)
             {
                 case ARG_POINTER:
-                    write_hex(stream, args[i]);
+                    fprintf(stream, "%p", (void *)args[i]);
                     break;
                 case ARG_INTEGER:
-                    write_int(stream, args[i]);
+                    fprintf(stream, "%ld", args[i]);
                     break;
                 case ARG_STRING:
-                    write_char(stream, '\"');
-                    write_string(stream, (const char *)args[i]);
-                    write_char(stream, '\"');
+                    fputc('\"', stream);
+                    fputs((const char *)args[i], stream);
+                    fputc('\"', stream);
                     break;
                 case ARG_BUFFER:
                 {
                     size_t len = (size_t)args[i+1];
                     const uint8_t *buf = (const uint8_t *)args[i];
-                    write_char(stream, '\"');
+                    fputc('\"', stream);
                     for (size_t j = 0; j < len; j++)
                         write_byte(stream, buf[j]);
-                    write_char(stream, '\"');
+                    fputc('\"', stream);
                     break;
                 }
                 case ARG_OPEN_FLAGS:
@@ -519,7 +422,7 @@ int hook(int callno, intptr_t arg1, intptr_t arg2, intptr_t arg3,
                     intptr_t flags = (i == 0? 0x0: args[i-1]);
                     intptr_t mode = args[i];
                     if ((flags & O_CREAT) == 0)
-                        write_hex(stream, mode);
+                        fprintf(stream, "0x%x", mode);
                     else
                         write_mode(stream, mode);
                     break;
@@ -531,30 +434,28 @@ int hook(int callno, intptr_t arg1, intptr_t arg2, intptr_t arg3,
                     write_signal(stream, args[i]);
                     break;
                 default:
-                    write_string(stream, "???");
+                    fputs("???", stream);
                     break;
             }
             write_color(stream, COLOR_CLEAR);
         }
-
-        write_string(stream, ")\n");
     }
     else
     {
-        write_string(stream, "syscall(callno=");
-        write_int(stream, callno);
+        fprintf(stream, "syscall(callno=%d", callno);
         for (unsigned i = 0; i < 6; i++)
-        {
-            write_string(stream, ", arg");
-            write_int(stream, (intptr_t)i);
-            write_char(stream, '=');
-            write_hex(stream, args[i]);
-        }
-        write_string(stream, ")\n");
+            fprintf(stderr, ", arg%d=0x%lx", i, args[i]);
     }
-
-    syscall(SYS_write, STDERR_FILENO, stream->buf, stream->pos);
+    fputs(")\n", stream);
 
     return -1;
+}
+
+/*
+ * Initialization function.
+ */
+void init(void)
+{
+    setvbuf(stderr, NULL, _IOLBF, 0);
 }
 

@@ -24,43 +24,6 @@
 
 #include "e9syscall.h"
 
-#define STRING(x)   STRING_2(x)
-#define STRING_2(x) #x
-
-/*
- * System call implementation.
- */
-asm
-(
-    ".globl syscall\n"
-    "syscall:\n"
-
-    // Disallow syscalls that MUST execute in the original context:
-    "cmp $" STRING(SYS_rt_sigreturn) ",%eax\n"
-    "je .Lno_sys\n"
-    "cmp $" STRING(SYS_clone) ",%eax\n"
-    "je .Lno_sys\n"
-
-    // Convert SYSV -> SYSCALL ABI:
-    "mov %edi,%eax\n"
-    "mov %rsi,%rdi\n"
-    "mov %rdx,%rsi\n"
-    "mov %rcx,%rdx\n"
-    "mov %r8,%r10\n"
-    "mov %r9,%r8\n"
-    "mov 0x8(%rsp),%r9\n"
-
-    // Execute the system call:
-    "syscall\n"
-
-    "retq\n"
-
-    // Handle errors:
-    ".Lno_sys:\n"
-    "mov $-" STRING(ENOSYS) ",%eax\n"
-    "retq\n"
-);
-
 /*
  * Entry point.
  */

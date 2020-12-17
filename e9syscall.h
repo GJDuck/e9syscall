@@ -25,20 +25,16 @@
 #ifndef __E9SYSCALL_H
 #define __E9SYSCALL_H
 
-#include <errno.h>
-#include <stdint.h>
-#define _GNU_SOURCE
-#include <unistd.h>
-#include <syscall.h>
+#include "stdlib.c"
 
 /*
  * The system call hook function to be defined by the user.  There are two
  * basic modes for the hook() function:
  *
  *  (1) [INSTRUMENTATION] The original system call will be executed with the
- *      original arguments after the hook() function has returned.  To enable this
- *      mode, the hook() function should return a non-zero value, and the
- *      *result value will be ignored.
+ *      original arguments after the hook() function has returned.  To enable
+ *      this mode, the hook() function should return a non-zero value, and the
+ *      result value will be ignored.
  *
  *  (2) [REPLACEMENT] The original system call is replaced by the hook()
  *      function.  To enable this mode, the hook() function should return 0,

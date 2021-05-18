@@ -31,6 +31,6 @@ int intercept(intptr_t *rax, intptr_t rdi, intptr_t rsi, intptr_t rdx,
     intptr_t r10, intptr_t r8, intptr_t r9)
 {
     int callno = (int)*rax;
-    return hook(callno, rdi, rsi, rdx, r10, r8, r9, rax);
+    return !hook(callno, rdi, rsi, rdx, r10, r8, r9, rax);
 }
 

@@ -1,0 +1,4 @@
+e9compile.sh
+e9patch*
+e9tool
+stdlib.c

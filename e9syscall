@@ -68,20 +68,20 @@ HOOKNAME=`basename "$HOOK" .c`
 set -e
 
 # STEP (1): check if e9patch is installed:
-if [ ! -x ./e9patch ]
+if [ ! -x ${E9_HOME:-.}/e9patch ]
 then
-    echo -e "${RED}error${OFF}: e9patch is not installed (run ./build.sh first) " >&2
+    echo -e "${RED}error${OFF}: e9patch is not installed (run ${E9_HOME:-.}/build.sh first) " >&2
 fi
 
 # STEP (2): build the hook code:
 echo -e "${GREEN}$0${OFF}: building hook ($HOOK)..."
-./e9compile.sh e9syscall-rt.c -O2 -Werror -include "$HOOK" -I "$PWD"
+${E9_HOME:-.}/e9compile.sh ${E9_HOME:-.}/e9syscall-rt.c -O2 -Werror -include "$HOOK" -I "$PWD" -I${E9_HOME:-.}
 mv e9syscall-rt "e9syscall_hook_$HOOKNAME"
 
 # STEP (3): patch libc:
 echo -e "${GREEN}$0${OFF}: patching libc ($LIBC)..."
-echo "./e9tool --match 'asm=syscall' --action 'call[conditional] intercept(&rax,rdi,rsi,rdx,r10,r8,r9)@'"e9syscall_hook_$HOOKNAME" "$LIBC" -o "libc-$HOOKNAME.so""
-./e9tool \
+echo "${E9_HOME:-.}/e9tool --match 'asm=syscall' --action 'call[conditional] intercept(&rax,rdi,rsi,rdx,r10,r8,r9)@'"e9syscall_hook_$HOOKNAME" "$LIBC" -o "libc-$HOOKNAME.so""
+${E9_HOME:-.}/e9tool \
     --match  'asm=syscall' \
     --action 'call[conditional] intercept(&rax,rdi,rsi,rdx,r10,r8,r9)@'"e9syscall_hook_$HOOKNAME" \
     "$LIBC" -o "libc-$HOOKNAME.so" | tee "e9patch-$HOOKNAME.log"

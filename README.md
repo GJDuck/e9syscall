@@ -7,11 +7,16 @@ rewrite `libc.so` into a new version with all system calls intercepted.
 Unlike other interception tools, E9Syscall does not rely on `ptrace` or
 signal handlers (`SIGTRAP`).
 
-## Build
+## Build & Install
 
 To build E9Syscall, simply run the `build.sh` script:
 
          $ ./build.sh
+
+To install E9Syscall:
+
+		$ export PATH=${PATH}:/path/to/e9syscall
+		$ export E9_HOME=/path/to/e9syscall
 
 ## Usage
 

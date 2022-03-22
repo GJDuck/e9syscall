@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright (C) 2020 National University of Singapore
+# Copyright (C) 2022 National University of Singapore
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -82,8 +82,8 @@ mv e9syscall-rt "e9syscall_hook_$HOOKNAME"
 echo -e "${GREEN}$0${OFF}: patching libc ($LIBC)..."
 echo "./e9tool --match 'asm=syscall' --action 'call[conditional] intercept(&rax,rdi,rsi,rdx,r10,r8,r9)@'"e9syscall_hook_$HOOKNAME" "$LIBC" -o "libc-$HOOKNAME.so""
 ./e9tool \
-    --match  'asm=syscall' \
-    --action 'call[conditional] intercept(&rax,rdi,rsi,rdx,r10,r8,r9)@'"e9syscall_hook_$HOOKNAME" \
+    -M  'asm="syscall"' \
+    -P 'if intercept(&rax,rdi,rsi,rdx,r10,r8,r9)@'"e9syscall_hook_$HOOKNAME break" \
     "$LIBC" -o "libc-$HOOKNAME.so" | tee "e9patch-$HOOKNAME.log"
 
 echo -e "${GREEN}$0${OFF}: done!"

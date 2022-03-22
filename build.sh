@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright (C) 2021 National University of Singapore
+# Copyright (C) 2022 National University of Singapore
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -32,7 +32,7 @@ fi
 
 set -e
 
-VERSION=eecba266dddca0090cf68bdd5eefacbba258d6e2
+VERSION=889a412ecdbf072d3626b1cc44e59439b030157c
 
 # STEP (1): install e9patch if necessary:
 if [ "`readlink e9patch`" != "e9patch-$VERSION/e9patch" ]

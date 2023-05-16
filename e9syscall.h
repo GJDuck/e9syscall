@@ -6,7 +6,7 @@
  *  \___|  /_/|___/\__, |___/\___\__,_|_|_|
  *                 |___/ 
  *
- * Copyright (C) 2020 National University of Singapore
+ * Copyright (C) 2023 National University of Singapore
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -26,6 +26,9 @@
 #define __E9SYSCALL_H
 
 #include "stdlib.c"
+
+#define E9SYSCALL_INSTRUMENT            (-1)
+#define E9SYSCALL_REPLACE               (0)
 
 /*
  * The system call hook function to be defined by the user.  There are two

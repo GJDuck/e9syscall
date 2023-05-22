@@ -27,8 +27,8 @@
 
 #include "stdlib.c"
 
-#define E9SYSCALL_INSTRUMENT            (-1)
-#define E9SYSCALL_REPLACE               (0)
+#define E9_INSTRUMENT               (-1)
+#define E9_REPLACE                  (0)
 
 /*
  * The system call hook function to be defined by the user.  There are two

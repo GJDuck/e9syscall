@@ -16,7 +16,6 @@
  */
 
 #include "e9syscall.h"
-#include <syscall.h>
 
 /*
  * PASSTHRU: Does nothing.
@@ -24,14 +23,13 @@
 int hook(int callno, intptr_t arg1, intptr_t arg2, intptr_t arg3,
     intptr_t arg4, intptr_t arg5, intptr_t arg6, intptr_t *result)
 {
-    if (callno == SYS_rt_sigreturn || callno == SYS_clone || callno == SYS_clone3)
+    if (callno == SYS_rt_sigreturn || callno == SYS_clone || callno == /*SYS_clone3=*/435)
     {
         // These syscalls cannot be replaced.
         return -1;
     }
 
     *result = syscall(callno, arg1, arg2, arg3, arg4, arg5, arg6);
-
     if (*result < 0) 
     {
         // Set errno by setting the result to be the negation of the error
